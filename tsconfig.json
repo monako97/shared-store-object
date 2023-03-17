@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+      "downlevelIteration": true,
       "strict": true,
       "baseUrl": ".",
       "target": "es5",

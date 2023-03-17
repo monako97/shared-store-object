@@ -1,11 +1,11 @@
 {
   "name": "shared-store-object",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "共享存储对象 Shared Store Object",
   "main": "lib/index.js",
   "scripts": {
     "prebuild": "rm -rf lib",
-    "build": "swc src -d lib -C module.type=commonjs -C minify=true && tsc"
+    "build": "swc src -d lib -C module.type=commonjs -C jsc.target=es5 -C jsc.loose=true -C jsc.minify.mangle=true -C jsc.minify.compress=true -C minify=true && tsc"
   },
   "dependencies": {
     "use-sync-external-store": "1.2.0"
@@ -15,6 +15,7 @@
     "@swc/core": "1.3.41",
     "@types/node": "^18.15.3",
     "@types/use-sync-external-store": "^0.0.3",
+    "eslint-config-neko": "^1.0.20",
     "typescript": "^5.0.2"
   },
   "files": [

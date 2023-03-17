@@ -22,20 +22,14 @@ type Methods<T> = Record<keyof T, AnyFn>;
 type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
 type Store<T> = T & Setter<T>;
 
-const __DEV__ = process.env.NODE_ENV !== 'production';
-const __DEV_ERR__ = (msg: string) => {
-  if (__DEV__) {
-    throw new Error(msg);
-  }
-};
-
 let isInMethod = false;
 let run = (fn: VoidFn) => {
   fn();
 };
 
-// eslint-disable-next-line valid-jsdoc
 /** 创建共享存储对象 Shared Store Object
+ * @param {any} data data
+ * @returns {Store} store
  * @example
  * // 创建状态
  * const store = sso({ count: 0 });
@@ -46,14 +40,15 @@ let run = (fn: VoidFn) => {
  * console.log(store.count); // 1
  */
 const sso = <T extends Data>(data: T): Store<T> => {
-  if (__DEV__ && Object.prototype.toString.call(data) !== '[object Object]') {
+  if (Object.prototype.toString.call(data) !== '[object Object]') {
     throw new Error('object required');
   }
+  const state: State<T> = Object.create(null) as State<T>;
+  const methods: Methods<T> = Object.create(null) as Methods<T>;
+  const keys: (keyof T)[] = Object.keys(data);
 
-  const state: State<T> = {} as State<T>;
-  const methods: Methods<T> = {} as Methods<T>;
-
-  Object.keys(data).forEach((key: keyof T) => {
+  for (let i = 0, len = keys.length; i < len; i++) {
+    const key = keys[i];
     const initVal = data[key];
 
     if (initVal instanceof Function) {
@@ -64,33 +59,31 @@ const sso = <T extends Data>(data: T): Store<T> => {
         isInMethod = false;
         return res;
       };
-      return;
+    } else {
+      const listeners = new Set<VoidFn>();
+
+      state[key] = {
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        getSnapshot: () => data[key],
+        setSnapshot: (val) => {
+          if (val !== data[key]) {
+            data[key] = val;
+            run(() => listeners.forEach((listener) => listener()));
+          }
+        },
+        useSnapshot: () => {
+          return useSyncExternalStore(
+            state[key].subscribe,
+            state[key].getSnapshot,
+            state[key].getSnapshot
+          );
+        },
+      };
     }
-
-    const listeners = new Set<VoidFn>();
-
-    state[key] = {
-      subscribe: (listener) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      },
-      getSnapshot: () => data[key],
-      setSnapshot: (val) => {
-        if (val !== data[key]) {
-          data[key] = val;
-          run(() => listeners.forEach((listener) => listener()));
-        }
-      },
-      useSnapshot: () => {
-        return useSyncExternalStore(
-          state[key].subscribe,
-          state[key].getSnapshot,
-          state[key].getSnapshot
-        );
-      },
-    };
-  });
-
+  }
   const setState = (key: keyof T, val: T[keyof T] | Updater<T[keyof T]>) => {
     if (key in data) {
       if (key in state) {
@@ -98,10 +91,10 @@ const sso = <T extends Data>(data: T): Store<T> => {
 
         state[key].setSnapshot(newVal);
       } else {
-        __DEV_ERR__(`\`${key as string}\` is a method, can not update`);
+        throw new Error(`\`${key as string}\` is a method, can not update`);
       }
     } else {
-      __DEV_ERR__(`\`${key as string}\` is not initialized in store`);
+      throw new Error(`\`${key as string}\` is not initialized in store`);
     }
   };
 
@@ -112,12 +105,9 @@ const sso = <T extends Data>(data: T): Store<T> => {
       get: (_, key: keyof T) => {
         if (key in methods) {
           return methods[key];
-        }
-
-        if (isInMethod) {
+        } else if (isInMethod) {
           return data[key];
         }
-
         try {
           return state[key].useSnapshot();
         } catch (err) {
@@ -132,7 +122,7 @@ const sso = <T extends Data>(data: T): Store<T> => {
         if (typeof updater === 'function') {
           setState(key, updater);
         } else {
-          __DEV_ERR__(`updater for \`${key as string}\` should be a function`);
+          throw new Error(`updater for \`${key as string}\` should be a function`);
         }
       },
     } as ProxyHandler<Store<T>>
