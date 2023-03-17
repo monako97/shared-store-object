@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "strict": true,
+      "baseUrl": ".",
+      "target": "es5",
+      "module": "commonjs",
+      "outDir": "lib",
+      "emitDeclarationOnly": true,
+      "declaration": true,
+      "newLine": "lf"
+    },
+    "exclude": ["node_modules"]
+  }
+  

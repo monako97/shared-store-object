@@ -1,0 +1,14 @@
+.temp_cache
+.idea
+.vscode
+.DS_Store
+.swc
+node_modules
+/dist
+/docs
+/lib
+/coverage
+__snapshots__
+/es
+package-lock.json
+yarn.lock
