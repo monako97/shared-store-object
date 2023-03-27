@@ -1,47 +1,55 @@
 import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
-type VoidFn = () => void;
 // eslint-disable-next-line no-unused-vars
-type AnyFn = (...args: unknown[]) => unknown;
+type ArgumentsVoid = <T>(...args: T[]) => T;
 // eslint-disable-next-line no-unused-vars
 type Updater<V> = (val: V) => V;
-
-type Data = Record<string, unknown>;
+// eslint-disable-next-line no-unused-vars
+type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
+type SSO<T> = T & Setter<T> & VoidFunction;
+type Methods<T> = Record<keyof T, ArgumentsVoid>;
+type Data = Record<string | symbol, unknown>;
 type State<T> = {
   [K in keyof T]: {
-    // eslint-disable-next-line no-unused-vars
-    subscribe: (listener: VoidFn) => VoidFn;
     getSnapshot: () => T[K];
     useSnapshot: () => T[K];
     // eslint-disable-next-line no-unused-vars
     setSnapshot: (val: T[K]) => void;
+    // eslint-disable-next-line no-unused-vars
+    subscribe: (listener: VoidFunction) => VoidFunction;
   };
 };
-type Methods<T> = Record<keyof T, AnyFn>;
-// eslint-disable-next-line no-unused-vars
-type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
-type Store<T> = T & Setter<T>;
-
+interface SSOConfig {
+  /** 在这里可以看到是哪段数据中的哪个属性发生了变化, 并判断是否需要进行迭代 */
+  next: typeof run;
+}
 let isInMethod = false;
-let run = (fn: VoidFn) => {
-  fn();
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+let run = function <T extends Data>(update: VoidFunction, _key: keyof T, _data: T) {
+  update();
 };
 
 /** 创建共享存储对象 Shared Store Object
- * @param {any} data data
- * @returns {Store} store
+ * @param {Data} data data
+ * @returns {SSO} store
  * @example
- * // 创建状态
+ * // react < 18 时使用批量更新
+ * sso.config({ next: ReactDOM.unstable_batchedUpdates });
+ * // 创建对象
  * const store = sso({ count: 0 });
  * // 使用
  * console.log(store.count); // 0
  * // 修改
  * store.count++;
  * console.log(store.count); // 1
+ * store('count', (prev) => prev + 1)
+ * console.log(store.count); // 2
+ * // 回收对象
+ * store()
  */
-const sso = <T extends Data>(data: T): Store<T> => {
+function sso<T extends Data>(data: T): SSO<T> {
   if (Object.prototype.toString.call(data) !== '[object Object]') {
-    throw new Error('object required');
+    throw new Error('The input parameter must be an Object.');
   }
   const state: State<T> = Object.create(null) as State<T>;
   const methods: Methods<T> = Object.create(null) as Methods<T>;
@@ -52,7 +60,7 @@ const sso = <T extends Data>(data: T): Store<T> => {
     const initVal = data[key];
 
     if (initVal instanceof Function) {
-      methods[key] = (...args: unknown[]) => {
+      methods[key] = function (...args) {
         isInMethod = true;
         const res = initVal(...args);
 
@@ -60,21 +68,31 @@ const sso = <T extends Data>(data: T): Store<T> => {
         return res;
       };
     } else {
-      const listeners = new Set<VoidFn>();
+      const listeners = new Set<VoidFunction>();
 
       state[key] = {
-        subscribe: (listener) => {
+        subscribe(listener) {
           listeners.add(listener);
           return () => listeners.delete(listener);
         },
-        getSnapshot: () => data[key],
-        setSnapshot: (val) => {
+        getSnapshot() {
+          return data[key];
+        },
+        setSnapshot(val) {
           if (val !== data[key]) {
             data[key] = val;
-            run(() => listeners.forEach((listener) => listener()));
+            run(
+              function () {
+                for (const listener of listeners.values()) {
+                  listener();
+                }
+              },
+              key,
+              data
+            );
           }
         },
-        useSnapshot: () => {
+        useSnapshot() {
           return useSyncExternalStore(
             state[key].subscribe,
             state[key].getSnapshot,
@@ -84,53 +102,52 @@ const sso = <T extends Data>(data: T): Store<T> => {
       };
     }
   }
-  const setState = (key: keyof T, val: T[keyof T] | Updater<T[keyof T]>) => {
+  function setState(key: keyof T, val: T[keyof T] | Updater<T[keyof T]>) {
     if (key in data) {
       if (key in state) {
-        const newVal = val instanceof Function ? val(data[key]) : val;
-
-        state[key].setSnapshot(newVal);
+        state[key].setSnapshot(val instanceof Function ? val(data[key]) : val);
       } else {
-        throw new Error(`\`${key as string}\` is a method, can not update`);
+        throw new Error(`"${String(key)}" is a method and cannot be updated.`);
       }
     } else {
-      throw new Error(`\`${key as string}\` is not initialized in store`);
+      throw new Error(`"${String(key)}" has not been initialized in the store.`);
     }
-  };
+  }
+  // eslint-disable-next-line no-undefined
+  const store = Proxy.revocable((() => undefined) as SSO<T>, {
+    get(_, key: keyof T) {
+      if (key in methods) {
+        return methods[key];
+      }
+      if (isInMethod) {
+        return data[key];
+      }
+      try {
+        return state[key].useSnapshot();
+      } catch (err) {
+        return data[key];
+      }
+    },
+    set(target, key: keyof T, val: T[keyof T]) {
+      setState(key, val);
+      return true;
+    },
+    apply(_, __, [key, updater]: [keyof T, Updater<T[keyof T]>]) {
+      if (typeof key === 'undefined') {
+        store.revoke();
+      } else if (typeof updater === 'function') {
+        setState(key, updater);
+      } else {
+        throw new Error(`The update program for "${String(key)}" should be a function.`);
+      }
+    },
+  });
 
-  return new Proxy(
-    // eslint-disable-next-line no-undefined
-    (() => undefined) as unknown as Store<T>,
-    {
-      get: (_, key: keyof T) => {
-        if (key in methods) {
-          return methods[key];
-        } else if (isInMethod) {
-          return data[key];
-        }
-        try {
-          return state[key].useSnapshot();
-        } catch (err) {
-          return data[key];
-        }
-      },
-      set: (_, key: keyof T, val: T[keyof T]) => {
-        setState(key, val);
-        return true;
-      },
-      apply: (_, __, [key, updater]: [keyof T, Updater<T[keyof T]>]) => {
-        if (typeof updater === 'function') {
-          setState(key, updater);
-        } else {
-          throw new Error(`updater for \`${key as string}\` should be a function`);
-        }
-      },
-    } as ProxyHandler<Store<T>>
-  );
-};
+  return store.proxy;
+}
 
-sso.config = ({ batch }: { batch: typeof run }) => {
-  run = batch;
+sso.config = ({ next }: SSOConfig) => {
+  run = next;
 };
 
 export default sso;
