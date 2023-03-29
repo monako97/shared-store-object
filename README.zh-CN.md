@@ -1,5 +1,7 @@
 # Shared Store Object
 
+[English](./README.md) · 简体中文
+
 ```js
 // 创建
 const like = sso({ count: 0 });

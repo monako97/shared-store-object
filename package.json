@@ -1,6 +1,6 @@
 {
   "name": "shared-store-object",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Shared Store Object",
   "main": "lib/index.js",
   "scripts": {
@@ -28,7 +28,8 @@
   },
   "files": [
     "lib",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md"
   ],
   "repository": {
     "type": "git",
