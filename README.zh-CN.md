@@ -1,30 +1,31 @@
 # Shared Store Object
 
 ```js
-// create
+// 创建
 const like = sso({ count: 0 });
-// use
+
+// 使用
 console.log(like.count); // 0
-// modify
+// 直接修改
 like.count++;
 console.log(like.count); // 1
-// modify using a functional approach.
-like('count', (prev) => prev + 1)
+// 函数函数修改
+like('count', (prev) => prev + 1);
 console.log(like.count); // 2
-// revoke
-like()
+// 回收对象
+like();
 ```
 
-## Configuration
+## 配置项
 
-### Global configuration
+### 全局配置
 
 ```js
-// when using React < 18, use batch updates to configure globally.
+// 当使用 React < 18 时，使用全局配置进行批量更新。
 sso.config({ next: ReactDOM.unstable_batchedUpdates });
 ```
 
-### Separate configuration
+### 单独为一个对象启用配置
 
 ```js
 const app = sso({
@@ -39,5 +40,4 @@ app((): Partial<SSOConfig> => {
     },
   };
 });
-
 ```

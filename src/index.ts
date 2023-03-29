@@ -6,7 +6,14 @@ type ArgumentsVoid = <T>(...args: T[]) => T;
 type Updater<V> = (val: V) => V;
 // eslint-disable-next-line no-unused-vars
 type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
-type SSO<T> = T & Setter<T> & VoidFunction;
+
+/**
+ * private configuration
+ * @returns {Partial<SSOConfig>} override configuration
+ */
+// eslint-disable-next-line no-unused-vars
+export type PrivateSSOConfig = (args?: unknown) => Partial<SSOConfig>;
+type SSO<T> = T & Setter<T> & PrivateSSOConfig & VoidFunction;
 type Methods<T> = Record<keyof T, ArgumentsVoid>;
 type Data = Record<string | symbol, unknown>;
 type State<T> = {
@@ -19,43 +26,102 @@ type State<T> = {
     subscribe: (listener: VoidFunction) => VoidFunction;
   };
 };
-interface SSOConfig {
-  /** 在这里可以看到是哪段数据中的哪个属性发生了变化, 并判断是否需要进行迭代 */
-  next: typeof run;
+/** SSO configuration */
+export interface SSOConfig {
+  /**
+   * iteration function
+   * @template T - object type
+   * @description Here, you can see which property in the data has changed and determine whether iteration is necessary.
+   * @param {VoidFunction} iteration - data object iteration method.
+   * @param {keyof T} _key - name of the property that was modified in the data object.
+   * @param {T} _data - the modified data object contains multiple properties.
+   * @returns {void}
+   */
+  // eslint-disable-next-line no-unused-vars
+  next: <T extends Data>(iteration: VoidFunction, _key: keyof T, _data: T) => void;
 }
+
 let isInMethod = false;
-// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
-let run = function <T extends Data>(update: VoidFunction, _key: keyof T, _data: T) {
-  update();
+const globalConfig: SSOConfig = {
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+  next(iteration, _key, _data) {
+    iteration();
+  },
 };
 
-/** 创建共享存储对象 Shared Store Object
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isObject(target: any): target is object {
+  const type = typeof target;
+
+  return target !== null && (type == 'object' || type == 'function');
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isFunction(target: any): target is VoidFunction {
+  return [
+    '[object Function]',
+    '[object AsyncFunction]',
+    '[object GeneratorFunction]',
+    '[object Proxy]',
+  ].includes(Object.prototype.toString.call(target));
+}
+
+/** validateConfiguration
+ * @param {Partial<SSOConfig>} config configuration
+ * @returns {void}
+ */
+function validateConfiguration(config: Partial<SSOConfig>): void {
+  if (!isObject(config)) {
+    throw new Error('Illegal configuration.');
+  }
+  for (
+    let i = 0, g = Object.keys(globalConfig), c = Object.keys(config), cl = c.length;
+    i < cl;
+    i++
+  ) {
+    const key = c[i] as keyof SSOConfig;
+
+    if (g.includes(key)) {
+      const type = typeof globalConfig[key],
+        inputType = typeof config[key];
+
+      if (type !== inputType) {
+        throw new Error(`${key} does not support ${inputType} type, it should be a ${type}.`);
+      }
+    } else {
+      throw new Error(`The "${key}" configuration item is currently not supported.`);
+    }
+  }
+}
+
+/** Shared Store Object
+ * @description create a shared store object
  * @param {Data} data data
- * @returns {SSO} store
+ * @returns {SSO} object
  * @example
- * // react < 18 时使用批量更新
+ * // when using React < 18, use batch updates to configure globally.
  * sso.config({ next: ReactDOM.unstable_batchedUpdates });
- * // 创建对象
- * const store = sso({ count: 0 });
- * // 使用
- * console.log(store.count); // 0
- * // 修改
- * store.count++;
- * console.log(store.count); // 1
- * store('count', (prev) => prev + 1)
- * console.log(store.count); // 2
- * // 回收对象
- * store()
+ * // create
+ * const like = sso({ count: 0 });
+ * // use
+ * console.log(like.count); // 0
+ * // modify
+ * like.count++;
+ * console.log(like.count); // 1
+ * // modify using a functional approach.
+ * like('count', (prev) => prev + 1)
+ * console.log(like.count); // 2
+ * // revoke
+ * like()
  */
 function sso<T extends Data>(data: T): SSO<T> {
-  if (Object.prototype.toString.call(data) !== '[object Object]') {
+  if (!isObject(data)) {
     throw new Error('The input parameter must be an Object.');
   }
-  const state: State<T> = Object.create(null) as State<T>;
-  const methods: Methods<T> = Object.create(null) as Methods<T>;
-  const keys: (keyof T)[] = Object.keys(data);
+  const config = { ...globalConfig };
+  const state = Object.create(null) as State<T>;
+  const methods = Object.create(null) as Methods<T>;
 
-  for (let i = 0, len = keys.length; i < len; i++) {
+  for (let i = 0, keys = Object.keys(data) as (keyof T)[], len = keys.length; i < len; i++) {
     const key = keys[i];
     const initVal = data[key];
 
@@ -71,9 +137,9 @@ function sso<T extends Data>(data: T): SSO<T> {
       const listeners = new Set<VoidFunction>();
 
       state[key] = {
-        subscribe(listener) {
-          listeners.add(listener);
-          return () => listeners.delete(listener);
+        subscribe(iterable) {
+          listeners.add(iterable);
+          return () => listeners.delete(iterable);
         },
         getSnapshot() {
           return data[key];
@@ -81,10 +147,10 @@ function sso<T extends Data>(data: T): SSO<T> {
         setSnapshot(val) {
           if (val !== data[key]) {
             data[key] = val;
-            run(
+            config.next(
               function () {
-                for (const listener of listeners.values()) {
-                  listener();
+                for (const iteration of listeners.values()) {
+                  iteration();
                 }
               },
               key,
@@ -128,17 +194,22 @@ function sso<T extends Data>(data: T): SSO<T> {
         return data[key];
       }
     },
-    set(target, key: keyof T, val: T[keyof T]) {
+    set(_, key: keyof T, val: T[keyof T]) {
       setState(key, val);
       return true;
     },
-    apply(_, __, [key, updater]: [keyof T, Updater<T[keyof T]>]) {
-      if (typeof key === 'undefined') {
+    apply(_, __, [prop, updater]: [keyof T | PrivateSSOConfig, Updater<T[keyof T]>]) {
+      if (typeof prop === 'undefined') {
         store.revoke();
-      } else if (typeof updater === 'function') {
-        setState(key, updater);
+      } else if (isFunction(prop)) {
+        const override = prop();
+
+        validateConfiguration(override);
+        Object.assign(config, override);
+      } else if (isFunction(updater)) {
+        setState(prop, updater);
       } else {
-        throw new Error(`The update program for "${String(key)}" should be a function.`);
+        throw new Error(`The update program for "${String(prop)}" should be a function.`);
       }
     },
   });
@@ -146,8 +217,14 @@ function sso<T extends Data>(data: T): SSO<T> {
   return store.proxy;
 }
 
-sso.config = ({ next }: SSOConfig) => {
-  run = next;
+/**
+ * SSO global configuration
+ * @param {Partial<SSOConfig>} config - configuration
+ * @returns {void}
+ */
+sso.config = function (config: Partial<SSOConfig>): void {
+  validateConfiguration(config);
+  Object.assign(globalConfig, config);
 };
 
 export default sso;

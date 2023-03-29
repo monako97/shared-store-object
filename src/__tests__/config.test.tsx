@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react';
 import ReactDOM from 'react-dom';
-import sso from '../index';
+import sso, { SSOConfig } from '../index';
 
 /**
  * @jest-environment jsdom
@@ -25,7 +26,20 @@ describe('sso', () => {
   };
 
   it('sso.config', () => {
+    expect(() => {
+      // @ts-ignore
+      sso.config(false);
+    }).toThrow('Illegal configuration.');
+    expect(() => {
+      // @ts-ignore
+      sso.config({ next: (update) => update(), a: 1 });
+    }).toThrow('The "a" configuration item is currently not supported.');
+    expect(() => {
+      // @ts-ignore
+      sso.config({ next: false });
+    }).toThrow('next does not support boolean type, it should be a function.');
     sso.config({ next: (update) => update() });
+    store((): Partial<SSOConfig> => ({ next: (update) => update() }));
     store.count = 0;
   });
   it('react < 18 batched updates', () => {

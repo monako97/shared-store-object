@@ -8,7 +8,7 @@ const config: Config = {
   testEnvironment: 'jsdom',
   roots: ['src'],
   coveragePathIgnorePatterns: ignore,
-  moduleFileExtensions: ['js', 'tsx'],
+  moduleFileExtensions: ['js', 'ts', 'tsx'],
   testPathIgnorePatterns: ignore,
   transformIgnorePatterns: ignore,
   transform: {
