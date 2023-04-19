@@ -1,6 +1,6 @@
 {
   "name": "shared-store-object",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Shared Store Object",
   "main": "lib/index.js",
   "scripts": {
@@ -9,7 +9,7 @@
     "test": "jest --watchAll --coverage"
   },
   "dependencies": {
-  "@moneko/common": "1.0.32",
+  "@moneko/common": "1.0.33",
     "use-sync-external-store": "1.2.0"
   },
   "devDependencies": {
