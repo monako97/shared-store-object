@@ -1,3 +1,4 @@
+import isEqual from '@moneko/common/lib/isEqual';
 import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
 // eslint-disable-next-line no-unused-vars
@@ -145,7 +146,7 @@ function sso<T extends Data>(data: T): SSO<T> {
           return data[key];
         },
         setSnapshot(val) {
-          if (val !== data[key]) {
+          if (!isEqual(val, data[key])) {
             data[key] = val;
             config.next(
               function () {
