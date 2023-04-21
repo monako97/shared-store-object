@@ -2,7 +2,7 @@
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react';
 import ReactDOM from 'react-dom';
-import sso, { SSOConfig } from '../index';
+import sso, { SSOConfig } from '../src';
 
 /**
  * @jest-environment jsdom
@@ -10,17 +10,34 @@ import sso, { SSOConfig } from '../index';
 describe('sso', () => {
   const store = sso({
     count: 0,
-    inc: () => store.count++,
+    list: [0],
+    obj: {
+      a1: 1,
+      a: { a: 1, c: '' },
+      b: () => 1 + 2,
+    } as Record<string, unknown>,
+    inc: () => {
+      store.count++;
+      store.list = [1];
+      store.list = [...store.list]; // not update
+      store.list = store.list.concat(store.count);
+      store.obj = { ...store.obj };
+      store.obj = { ...store.obj, d: 2 };
+      store.obj = { ...store.obj, a1: '', a: { a: 2 }, b: () => 2 + 1 };
+    },
   });
   const App = () => {
-    const { count, inc } = store;
+    const { list, count, inc } = store;
 
     return (
       <>
-        <p>{count}</p>
+        <p>click:{count}</p>
         <button onClick={inc}>inc</button>
         <button onClick={() => store.count++}>btn2</button>
         <button onClick={() => store('count', (prev) => prev + 1)}>btn3</button>
+        {list.map((e, i) => (
+          <React.Fragment key={i}>{e}</React.Fragment>
+        ))}
       </>
     );
   };
@@ -50,15 +67,15 @@ describe('sso', () => {
 
     fireEvent.click(getByText('inc'));
     act(() => {
-      expect(getByText('1')).toBeDefined();
+      expect(getByText('click:1')).toBeDefined();
     });
     fireEvent.click(getByText('btn2'));
     act(() => {
-      expect(getByText('2')).toBeDefined();
+      expect(getByText('click:2')).toBeDefined();
     });
     fireEvent.click(getByText('btn3'));
     act(() => {
-      expect(getByText('3')).toBeDefined();
+      expect(getByText('click:3')).toBeDefined();
     });
   });
 });

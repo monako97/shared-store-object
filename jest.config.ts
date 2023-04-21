@@ -6,7 +6,7 @@ const config: Config = {
   clearMocks: true,
   coverageDirectory: 'coverage',
   testEnvironment: 'jsdom',
-  roots: ['src'],
+  roots: ['.'],
   coveragePathIgnorePatterns: ignore,
   moduleFileExtensions: ['js', 'ts', 'tsx'],
   testPathIgnorePatterns: ignore,
@@ -14,7 +14,7 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)sx?$': '@swc/jest',
   },
-  testMatch: ['<rootDir>/src/**/__tests__/**/*.test.tsx'],
+  testMatch: ['<rootDir>/tests/*.test.tsx'],
   moduleNameMapper: {
     'shared-store-object': '<rootDir>/src/index.ts',
   },
