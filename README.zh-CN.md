@@ -25,6 +25,8 @@ yarn add shared-store-object -S
 ## 使用
 
 ```js
+import sso from 'shared-store-object';
+
 // 创建
 const like = sso(
   // 属性
@@ -57,6 +59,8 @@ like();
 ### 全局配置
 
 ```js
+import sso from 'shared-store-object';
+
 // 当使用 React < 18 时，使用全局配置进行批量更新。
 sso.config({ next: ReactDOM.unstable_batchedUpdates });
 ```
@@ -64,6 +68,8 @@ sso.config({ next: ReactDOM.unstable_batchedUpdates });
 ### 单独为一个对象启用配置
 
 ```js
+import sso from 'shared-store-object';
+
 const app = sso({
   count: 0,
 });

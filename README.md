@@ -25,6 +25,8 @@ yarn add shared-store-object -S
 ## Use
 
 ```js
+import sso from 'shared-store-object';
+
 // create
 const like = sso(
   // property
@@ -57,6 +59,8 @@ like();
 ### Global configuration
 
 ```js
+import sso from 'shared-store-object';
+
 // when using React < 18, use batch updates to configure globally.
 sso.config({ next: ReactDOM.unstable_batchedUpdates });
 ```
@@ -64,6 +68,8 @@ sso.config({ next: ReactDOM.unstable_batchedUpdates });
 ### Separate configuration
 
 ```js
+import sso from 'shared-store-object';
+
 const app = sso({
   count: 0,
 });
