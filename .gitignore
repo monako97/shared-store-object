@@ -12,3 +12,4 @@ __snapshots__
 /es
 package-lock.json
 yarn.lock
+pnpm-lock.yaml

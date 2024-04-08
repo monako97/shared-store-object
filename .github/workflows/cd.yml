@@ -9,26 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout Code'
-        uses: actions/checkout@v2
+      - name: 'Checkout'
+        uses: actions/checkout@v4
       - name: 'Setup nodejs'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
           registry-url: 'https://registry.npmjs.org'
-      - name: Cache Node Modules
-        id: cache-node-modules
-        uses: actions/cache@v3.0.11
+      - name: 'Setup pnpm'
+        uses: pnpm/action-setup@v3
         with:
-          path:  |
-            node_modules
-            yarn.lock
-          key: node-modules-${{ hashFiles('package.json') }}
-          restore-keys: node-modules-
+          version: 8
       - name: 'install'
-        run: yarn
+        run: pnpm install
       - name: 'Build Artifact'
-        run: yarn build
+        run: pnpm build
       - name: 'Publish to npm'
         run: |
           NPM_PACKAGE_NAME=$(node -p "require('./package.json').name")
