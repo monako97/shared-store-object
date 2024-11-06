@@ -14,11 +14,19 @@ type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
 // eslint-disable-next-line no-unused-vars
 export type PrivateSSOConfig = (args?: unknown) => Partial<SSOConfig>;
 type NonFunctionPropertyNames<T> = {
-  [K in keyof T]: T[K] extends VoidFunction ? never : K;
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? never : K;
 }[keyof T];
 type FunctionProperties<T> = {
-  [K in keyof T]: T[K] extends VoidFunction ? K : never;
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
 }[keyof T];
+// type BindFunctionThis<T, S> = {
+//   [K in keyof T]: T[K] extends (...args: any[]) => any 
+//   ? (this: S, ...args: Parameters<T[K]>) => ReturnType<T[K]>
+//   : T[K]
+// };
+// type BindComputedThis<C extends Record<any, (...args: any[]) => unknown>, T> = {
+//   [K in keyof C]: (this: T) => ReturnType<C[K]>
+// };
 type DisallowCommonKeys<T, U> = Record<keyof T & keyof U, never>;
 
 export type SSO<T, C> = Pick<T, NonFunctionPropertyNames<T>> &
@@ -27,9 +35,8 @@ export type SSO<T, C> = Pick<T, NonFunctionPropertyNames<T>> &
   Setter<Pick<T, NonFunctionPropertyNames<T>>> &
   PrivateSSOConfig &
   VoidFunction;
-type Methods<T> = Record<keyof T, ArgumentsVoid>;
 type Data = Record<string | symbol, unknown>;
-type Compute<C = unknown> = Record<keyof C, () => unknown>;
+type Compute<C = unknown, S = unknown> = Record<keyof C, (this: S) => unknown>;
 type RecordWithReturn<O extends Compute> = {
   [K in keyof O]: O[K] extends VoidFunction ? ReturnType<O[K]> : unknown;
 };
@@ -65,7 +72,6 @@ function isObject(target: unknown): target is object {
 
   return target !== null && (type == 'object' || type == 'function');
 }
-
 function arrayEqual<A extends [], B extends []>(one: A, arr2: B): boolean {
   if (one.length !== arr2.length) {
     return false;
@@ -117,7 +123,6 @@ function isEqual<A, B>(obj1: A, obj2: B): boolean {
   return (obj1 as string) === (obj2 as string);
 }
 
-let isInMethod = false;
 const globalConfig: SSOConfig = {
   next(iteration) {
     iteration();
@@ -151,7 +156,6 @@ function validateConfiguration(config: Partial<SSOConfig>): void {
     }
   }
 }
-
 /** Shared Store Object
  * @description create a shared store object
  * @param {Data} property property
@@ -175,14 +179,17 @@ function validateConfiguration(config: Partial<SSOConfig>): void {
  */
 function sso<T extends Data, C extends Compute>(
   property: T,
-  computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, VoidFunction>
+  computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, Function>
 ): SSO<T, RecordWithReturn<C>> {
   if (!isObject(property)) {
     throw new Error('The input parameter must be an Object.');
   }
+  type Self = SSO<T, RecordWithReturn<C>>;
+  let isInMethod = false;
   const config = { ...globalConfig };
   const state = Object.create(null) as State<T>;
-  const methods = Object.create(null) as Methods<T>;
+  const methods = Object.create(null) as Record<keyof T, ArgumentsVoid>;
+  const computeds = Object.create(null) as Record<keyof C, (self: Self) => void>;
 
   for (let i = 0, keys = Object.keys(property) as (keyof T)[], len = keys.length; i < len; i++) {
     const key = keys[i];
@@ -191,7 +198,7 @@ function sso<T extends Data, C extends Compute>(
     if (initVal instanceof Function) {
       methods[key] = function (...args) {
         isInMethod = true;
-        const res = initVal(...args);
+        const res = initVal.apply(store.proxy, ...args);
 
         isInMethod = false;
         return res;
@@ -205,11 +212,11 @@ function sso<T extends Data, C extends Compute>(
           return () => listeners.delete(iterable);
         },
         getSnapshot() {
-          return property[key];
+          return property[key] as T[keyof T];
         },
         setSnapshot(val) {
           if (!isEqual(val, property[key])) {
-            property[key] = val;
+            (property[key] as T[keyof T]) = val;
             config.next(
               function () {
                 for (const iteration of listeners.values()) {
@@ -217,7 +224,7 @@ function sso<T extends Data, C extends Compute>(
                 }
               },
               key,
-              property
+              property as T
             );
           }
         },
@@ -231,13 +238,23 @@ function sso<T extends Data, C extends Compute>(
       };
     }
   }
+  for (let i = 0, keys = Object.keys(computedProperty || {}) as (keyof C)[], len = keys.length; i < len; i++) {
+    const key = keys[i];
+    computeds[key] = function (self: Self) {
+      isInMethod = true;
+      const res = (computedProperty![key] as VoidFunction).apply(self);
+
+      isInMethod = false;
+      return res;
+    };
+  }
   function setState(key: keyof T, val: T[keyof T] | Updater<T[keyof T]>) {
-    if (computedProperty && key in computedProperty) {
+    if (key in computeds) {
       throw new Error(`"${String(key)}" is a Computed property and cannot be updated.`);
     }
     if (key in property) {
       if (key in state) {
-        state[key].setSnapshot(val instanceof Function ? val(property[key]) : val);
+        state[key].setSnapshot(val instanceof Function ? val(property[key] as T[keyof T]) : val);
       } else {
         throw new Error(`"${String(key)}" is a method and cannot be updated.`);
       }
@@ -246,9 +263,9 @@ function sso<T extends Data, C extends Compute>(
     }
   }
   const store = Proxy.revocable(Function() as SSO<T, RecordWithReturn<C>>, {
-    get<K extends keyof T & keyof C & string & symbol>(_: SSO<T, RecordWithReturn<C>>, key: K) {
-      if (computedProperty && key in computedProperty) {
-        return (computedProperty as Compute<C>)[key]();
+    get<K extends keyof T & keyof C & string & symbol>(_: any, key: K, rec: Self) {
+      if (key in computeds) {
+        return computeds[key](rec);
       }
       if (key in methods) {
         return methods[key];

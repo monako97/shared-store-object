@@ -16,14 +16,16 @@ describe('sso', () => {
       a: { a: 1, c: '' },
       b: () => 1 + 2,
     } as Record<string, unknown>,
-    inc: () => {
+    inc(this: typeof store) {
+      console.log(this.obj);
       store.count++;
-      store.list = [1];
+      this.list = [1];
       store.list = [...store.list]; // not update
-      store.list = store.list.concat(store.count);
-      store.obj = { ...store.obj };
+      store.list = this.list.concat(store.count);
+      this.obj = { ...store.obj };
       store.obj = { ...store.obj, d: 2 };
-      store.obj = { ...store.obj, a1: '', a: { a: 2 }, b: () => 2 + 1 };
+      this.obj = { ...this.obj, a1: '', a: { a: 2 }, b: () => 2 + 1 };
+      return 1
     },
   });
   const App = () => {

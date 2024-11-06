@@ -9,7 +9,9 @@ import sso from '../src';
 describe('sso', () => {
   const store = sso({
     count: 0,
-    inc: () => store.count++,
+    inc() {
+      this.count++;
+    },
   });
 
   beforeAll(() => {
@@ -63,6 +65,9 @@ describe('sso', () => {
         count: 1,
         age: 2,
         a: 1,
+        add() {
+          return app.count + 1;
+        }
       },
       {
         b() {
