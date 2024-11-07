@@ -29,7 +29,7 @@ type FunctionProperties<T> = {
 // };
 type DisallowCommonKeys<T, U> = Record<keyof T & keyof U, never>;
 
-export type SSO<T, C> = Pick<T, NonFunctionPropertyNames<T>> &
+export type SSO<T, C = Compute> = Pick<T, NonFunctionPropertyNames<T>> &
   Readonly<Pick<T, FunctionProperties<T>>> &
   Readonly<C> &
   Setter<Pick<T, NonFunctionPropertyNames<T>>> &
@@ -177,7 +177,8 @@ function validateConfiguration(config: Partial<SSOConfig>): void {
  * // revoke
  * like()
  */
-function sso<T extends Data, C extends Compute>(
+function sso<T extends Data, C extends Compute = Compute>(
+  // property: BindFunctionThis<T, SSO<T>> & T,
   property: T,
   computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, Function>
 ): SSO<T, RecordWithReturn<C>> {
@@ -189,7 +190,6 @@ function sso<T extends Data, C extends Compute>(
   const config = { ...globalConfig };
   const state = Object.create(null) as State<T>;
   const methods = Object.create(null) as Record<keyof T, ArgumentsVoid>;
-  const computeds = Object.create(null) as Record<keyof C, (self: Self) => void>;
 
   for (let i = 0, keys = Object.keys(property) as (keyof T)[], len = keys.length; i < len; i++) {
     const key = keys[i];
@@ -238,18 +238,8 @@ function sso<T extends Data, C extends Compute>(
       };
     }
   }
-  for (let i = 0, keys = Object.keys(computedProperty || {}) as (keyof C)[], len = keys.length; i < len; i++) {
-    const key = keys[i];
-    computeds[key] = function (self: Self) {
-      isInMethod = true;
-      const res = (computedProperty![key] as VoidFunction).apply(self);
-
-      isInMethod = false;
-      return res;
-    };
-  }
   function setState(key: keyof T, val: T[keyof T] | Updater<T[keyof T]>) {
-    if (key in computeds) {
+    if (computedProperty && key in computedProperty) {
       throw new Error(`"${String(key)}" is a Computed property and cannot be updated.`);
     }
     if (key in property) {
@@ -264,8 +254,12 @@ function sso<T extends Data, C extends Compute>(
   }
   const store = Proxy.revocable(Function() as SSO<T, RecordWithReturn<C>>, {
     get<K extends keyof T & keyof C & string & symbol>(_: any, key: K, rec: Self) {
-      if (key in computeds) {
-        return computeds[key](rec);
+      if (computedProperty && key in computedProperty) {
+        isInMethod = true;
+        const res = (computedProperty![key] as VoidFunction).apply(rec);
+
+        isInMethod = false;
+        return res;
       }
       if (key in methods) {
         return methods[key];
