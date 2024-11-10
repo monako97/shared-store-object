@@ -198,7 +198,7 @@ function sso<T extends Data, C extends Compute = Compute>(
     if (initVal instanceof Function) {
       methods[key] = function (...args) {
         isInMethod = true;
-        const res = initVal.apply(store.proxy, ...args);
+        const res = initVal.call(store.proxy, ...args);
 
         isInMethod = false;
         return res;
@@ -256,7 +256,7 @@ function sso<T extends Data, C extends Compute = Compute>(
     get<K extends keyof T & keyof C & string & symbol>(_: any, key: K, rec: Self) {
       if (computedProperty && key in computedProperty) {
         isInMethod = true;
-        const res = (computedProperty![key] as VoidFunction).apply(rec);
+        const res = (computedProperty![key] as VoidFunction).call(rec);
 
         isInMethod = false;
         return res;
