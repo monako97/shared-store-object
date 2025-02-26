@@ -1,17 +1,14 @@
+import { isEqual, isFunction, isObject } from '@moneko/common';
 import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
-// eslint-disable-next-line no-unused-vars
 type ArgumentsVoid = <T>(...args: T[]) => T;
-// eslint-disable-next-line no-unused-vars
 type Updater<V> = (val: V) => V;
-// eslint-disable-next-line no-unused-vars
 type Setter<T> = <K extends keyof T>(key: K, updater: Updater<T[K]>) => void;
 
 /**
  * private configuration
  * @returns {Partial<SSOConfig>} override configuration
  */
-// eslint-disable-next-line no-unused-vars
 export type PrivateSSOConfig = (args?: unknown) => Partial<SSOConfig>;
 type NonFunctionPropertyNames<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any ? never : K;
@@ -20,7 +17,7 @@ type FunctionProperties<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
 }[keyof T];
 // type BindFunctionThis<T, S> = {
-//   [K in keyof T]: T[K] extends (...args: any[]) => any 
+//   [K in keyof T]: T[K] extends (...args: any[]) => any
 //   ? (this: S, ...args: Parameters<T[K]>) => ReturnType<T[K]>
 //   : T[K]
 // };
@@ -44,9 +41,7 @@ type State<T> = {
   [K in keyof T]: {
     getSnapshot: () => T[K];
     useSnapshot: () => T[K];
-    // eslint-disable-next-line no-unused-vars
     setSnapshot: (val: T[K]) => void;
-    // eslint-disable-next-line no-unused-vars
     subscribe: (listener: VoidFunction) => VoidFunction;
   };
 };
@@ -61,66 +56,7 @@ export interface SSOConfig {
    * @param {T} data - the modified data object contains multiple properties.
    * @returns {void}
    */
-  // eslint-disable-next-line no-unused-vars
   next: <T extends Data>(iteration: VoidFunction, key: keyof T, data: T) => void;
-}
-function isFunction(target: unknown): target is VoidFunction | ArgumentsVoid {
-  return target instanceof Function;
-}
-function isObject(target: unknown): target is object {
-  const type = typeof target;
-
-  return target !== null && (type == 'object' || type == 'function');
-}
-function arrayEqual<A extends [], B extends []>(one: A, arr2: B): boolean {
-  if (one.length !== arr2.length) {
-    return false;
-  }
-  for (let i = 0, len = one.length; i < len; i++) {
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
-    if (!isEqual(one[i], arr2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-function objectEqual<A extends object, B extends object>(val1: A, val2: B): boolean {
-  const keys = Object.keys(val1);
-
-  if (keys.length !== Object.keys(val2).length) {
-    return false;
-  }
-  for (let i = 0, len = keys.length; i < len; i++) {
-    const key = keys[i] as keyof A & keyof B;
-
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
-    if (!isEqual(val1[key], val2[key])) {
-      return false;
-    }
-  }
-  return true;
-}
-function isEqual<A, B>(obj1: A, obj2: B): boolean {
-  const type = Object.prototype.toString.call(obj1);
-
-  if (type !== Object.prototype.toString.call(obj2)) {
-    return false;
-  }
-  if (type === '[object Array]') {
-    return arrayEqual(obj1 as [], obj2 as []);
-  } else if (type === '[object Object]') {
-    return objectEqual(obj1 as object, obj2 as object);
-  } else if (
-    [
-      '[object Function]',
-      '[object AsyncFunction]',
-      '[object GeneratorFunction]',
-      '[object Proxy]',
-    ].includes(type)
-  ) {
-    return (obj1 as VoidFunction).toString() === (obj2 as VoidFunction).toString();
-  }
-  return (obj1 as string) === (obj2 as string);
 }
 
 const globalConfig: SSOConfig = {
@@ -180,7 +116,7 @@ function validateConfiguration(config: Partial<SSOConfig>): void {
 function sso<T extends Data, C extends Compute = Compute>(
   // property: BindFunctionThis<T, SSO<T>> & T,
   property: T,
-  computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, Function>
+  computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, Function>,
 ): SSO<T, RecordWithReturn<C>> {
   if (!isObject(property)) {
     throw new Error('The input parameter must be an Object.');
@@ -224,7 +160,7 @@ function sso<T extends Data, C extends Compute = Compute>(
                 }
               },
               key,
-              property as T
+              property as T,
             );
           }
         },
@@ -232,7 +168,7 @@ function sso<T extends Data, C extends Compute = Compute>(
           return useSyncExternalStore(
             state[key].subscribe,
             state[key].getSnapshot,
-            state[key].getSnapshot
+            state[key].getSnapshot,
           );
         },
       };
