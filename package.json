@@ -6,8 +6,8 @@
   "scripts": {
     "prebuild": "rm -rf lib",
     "build": "swc src/index.ts -d lib --strip-leading-paths -C module.type=commonjs -C jsc.target=es5 -C jsc.loose=true -C jsc.minify.mangle=true -C jsc.minify.compress=true -C minify=true && tsc",
-    "postbuild": "jest --coverage",
-    "test": "jest --watchAll --coverage"
+    "test": "jest --coverage",
+    "test:watch": "jest --watchAll --coverage"
   },
   "sideEffects": false,
   "dependencies": {
