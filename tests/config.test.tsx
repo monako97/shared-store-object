@@ -1,44 +1,53 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-import React from 'react';
-import { act, fireEvent, render } from '@testing-library/react';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import ReactDOM from 'react-dom';
-import sso, { SSOConfig } from '../src';
+import sso, { SSOConfig } from 'shared-store-object';
 
-/**
- * @jest-environment jsdom
- */
+Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+  value: true,
+  writable: true,
+});
+
 describe('sso', () => {
-  const store = sso({
-    count: 0,
-    list: [0],
-    obj: {
-      a1: 1,
-      a: { a: 1, c: '' },
-      b: () => 1 + 2,
-    } as Record<string, unknown>,
-    inc(this: typeof store) {
-      console.log(this.obj);
-      store.count++;
-      this.list = [1];
-      store.list = [...store.list]; // not update
-      store.list = this.list.concat(store.count);
-      this.obj = { ...store.obj };
-      store.obj = { ...store.obj, d: 2 };
-      this.obj = { ...this.obj, a1: '', a: { a: 2 }, b: () => 2 + 1 };
-      return 1
+  const store = sso(
+    {
+      count: 0,
+      list: [0],
+      obj: {
+        a1: 1,
+        a: { a: 1, c: '' },
+        b: () => 1 + 2,
+      } as Record<string, unknown>,
+      inc() {
+        console.log(this.obj);
+        store.count++;
+        this.list = [1];
+        store.list = [...store.list]; // not update
+        store.list = this.list.concat(store.count);
+        this.obj = { ...store.obj };
+        store.obj = { ...store.obj, d: 2 };
+        this.obj = { ...this.obj, a1: '', a: { a: 2 }, b: () => 2 + 1 };
+        return 1;
+      },
     },
-  });
+    {
+      listCount() {
+        return store.list.length;
+      },
+    }
+  );
   const App = () => {
-    const { list, count, inc } = store;
+    const { list, count, listCount, inc } = store;
 
     return (
       <>
         <p>click:{count}</p>
+        <p>list count:{listCount}</p>
         <button onClick={inc}>inc</button>
         <button onClick={() => store.count++}>btn2</button>
         <button onClick={() => store('count', (prev) => prev + 1)}>btn3</button>
         {list.map((e, i) => (
-          <React.Fragment key={i}>{e}</React.Fragment>
+          <span key={i}>{`list:${e}`}</span>
         ))}
       </>
     );
@@ -64,20 +73,70 @@ describe('sso', () => {
   it('react < 18 batched updates', () => {
     sso.config({ next: ReactDOM.unstable_batchedUpdates });
   });
-  it('react render', () => {
-    const { getByText } = render(<App />);
+  it('react render', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    await act(async () => {
+      createRoot(container).render(<App />);
+    });
+    const [incBtn, btn2, btn3] = container.querySelectorAll('button');
 
-    fireEvent.click(getByText('inc'));
-    act(() => {
-      expect(getByText('click:1')).toBeDefined();
+    await act(async () => {
+      incBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    fireEvent.click(getByText('btn2'));
-    act(() => {
-      expect(getByText('click:2')).toBeDefined();
+
+    expect(
+      [...container.querySelectorAll('span')].map((item) => item.textContent).includes('list:1')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('click:1')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('list count:2')
+    ).toBeTruthy();
+
+    await act(async () => {
+      btn2.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    fireEvent.click(getByText('btn3'));
-    act(() => {
-      expect(getByText('click:3')).toBeDefined();
+
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('click:2')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('list count:2')
+    ).toBeTruthy();
+
+    await act(async () => {
+      btn3.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('click:3')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('list count:2')
+    ).toBeTruthy();
+
+    await act(async () => {
+      incBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(
+      [...container.querySelectorAll('span')].map((item) => item.textContent).includes('list:1')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('span')].map((item) => item.textContent).includes('list:4')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('click:4')
+    ).toBeTruthy();
+    expect(
+      [...container.querySelectorAll('p')].map((item) => item.textContent).includes('list count:2')
+    ).toBeTruthy();
+
+    expect(() => {
+      store.listCount === 0;
+      // @ts-ignore
+      store.listCount = 100; // should not update
+    }).toThrow('"listCount" is a Computed property and cannot be updated.');
   });
 });

@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import React from 'react';
-import { act, render } from '@testing-library/react';
-import sso from '../src';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import sso from 'shared-store-object';
 
-/**
- * @jest-environment jsdom
- */
+Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+  value: true,
+  writable: true,
+});
+
 describe('sso', () => {
   const store = sso({
     count: 0,
@@ -14,8 +16,12 @@ describe('sso', () => {
     },
   });
 
-  beforeAll(() => {
-    render(<div />);
+  beforeAll(async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    await act(async () => {
+      createRoot(container).render(<div />);
+    });
   });
   it('The input parameter must be an Object.', () => {
     expect(() => {
@@ -67,7 +73,7 @@ describe('sso', () => {
         a: 1,
         add() {
           return app.count + 1;
-        }
+        },
       },
       {
         b() {

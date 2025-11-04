@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { isEqual, isFunction, isObject } from '@moneko/common';
-import { useSyncExternalStore } from 'use-sync-external-store/shim';
+import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector';
 
 type ArgumentsVoid = <T>(...args: T[]) => T;
 type Updater<V> = (val: V) => V;
@@ -39,10 +40,11 @@ type RecordWithReturn<O extends Compute> = {
 };
 type State<T> = {
   [K in keyof T]: {
-    getSnapshot: () => T[K];
-    useSnapshot: () => T[K];
-    setSnapshot: (val: T[K]) => void;
-    subscribe: (listener: VoidFunction) => VoidFunction;
+    getSnapshot(): T[K];
+    useSnapshot(): T[K];
+    setSnapshot(val: T[K]): void;
+    selector(snapshot: T[K]): T[K];
+    subscribe(listener: VoidFunction): VoidFunction;
   };
 };
 /** SSO configuration */
@@ -56,7 +58,7 @@ export interface SSOConfig {
    * @param {T} data - the modified data object contains multiple properties.
    * @returns {void}
    */
-  next: <T extends Data>(iteration: VoidFunction, key: keyof T, data: T) => void;
+  next<T extends Data>(iteration: VoidFunction, key: keyof T, data: T): void;
 }
 
 const globalConfig: SSOConfig = {
@@ -114,8 +116,8 @@ function validateConfiguration(config: Partial<SSOConfig>): void {
  * like()
  */
 function sso<T extends Data, C extends Compute = Compute>(
-  // property: BindFunctionThis<T, SSO<T>> & T,
   property: T,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   computedProperty?: C & DisallowCommonKeys<C, T> & Record<keyof C, Function>,
 ): SSO<T, RecordWithReturn<C>> {
   if (!isObject(property)) {
@@ -132,9 +134,10 @@ function sso<T extends Data, C extends Compute = Compute>(
     const initVal = property[key];
 
     if (initVal instanceof Function) {
-      methods[key] = function (...args) {
+      methods[key] = function () {
         isInMethod = true;
-        const res = initVal.call(store.proxy, ...args);
+        // eslint-disable-next-line prefer-rest-params
+        const res = initVal.apply(store.proxy, arguments);
 
         isInMethod = false;
         return res;
@@ -149,6 +152,9 @@ function sso<T extends Data, C extends Compute = Compute>(
         },
         getSnapshot() {
           return property[key] as T[keyof T];
+        },
+        selector(snapshot) {
+          return snapshot;
         },
         setSnapshot(val) {
           if (!isEqual(val, property[key])) {
@@ -165,10 +171,12 @@ function sso<T extends Data, C extends Compute = Compute>(
           }
         },
         useSnapshot() {
-          return useSyncExternalStore(
+          return useSyncExternalStoreWithSelector(
             state[key].subscribe,
             state[key].getSnapshot,
             state[key].getSnapshot,
+            state[key].selector,
+            isEqual,
           );
         },
       };
@@ -205,7 +213,7 @@ function sso<T extends Data, C extends Compute = Compute>(
       }
       try {
         return state[key].useSnapshot();
-      } catch (err) {
+      } catch {
         return property[key];
       }
     },
