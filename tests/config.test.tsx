@@ -1,7 +1,7 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import ReactDOM from 'react-dom';
-import sso, { SSOConfig } from 'shared-store-object';
+import { unstable_batchedUpdates } from 'react-dom';
+import sso, { type SSOConfig } from 'shared-store-object';
 
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
   value: true,
@@ -52,6 +52,9 @@ describe('sso', () => {
       </>
     );
   };
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
 
   it('sso.config', () => {
     expect(() => {
@@ -71,13 +74,11 @@ describe('sso', () => {
     store.count = 0;
   });
   it('react < 18 batched updates', () => {
-    sso.config({ next: ReactDOM.unstable_batchedUpdates });
+    sso.config({ next: unstable_batchedUpdates });
   });
   it('react render', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
     await act(async () => {
-      createRoot(container).render(<App />);
+      root.render(<App />);
     });
     const [incBtn, btn2, btn3] = container.querySelectorAll('button');
 
@@ -133,6 +134,9 @@ describe('sso', () => {
       [...container.querySelectorAll('p')].map((item) => item.textContent).includes('list count:2')
     ).toBeTruthy();
 
+    await act(async () => {
+      root.unmount();
+    });
     expect(() => {
       store.listCount === 0;
       // @ts-ignore

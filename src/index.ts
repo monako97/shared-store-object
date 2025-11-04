@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { isEqual, isFunction, isObject } from '@moneko/common';
 import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector';
 

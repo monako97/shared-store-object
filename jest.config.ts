@@ -12,7 +12,7 @@ const config: Config = {
   testPathIgnorePatterns: ignore,
   transformIgnorePatterns: ignore,
   transform: {
-    '^.+\\.(t|j)sx?$': '@swc/jest',
+    '^.+\\.(t|j)sx?$': ['@swc/jest', { jsc: { transform: { react: { runtime: 'automatic' } } } }],
   },
   testMatch: ['<rootDir>/tests/*.test.tsx'],
   moduleNameMapper: {
