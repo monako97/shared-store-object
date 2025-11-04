@@ -24,6 +24,8 @@ jobs:
         run: pnpm install
       - name: 'Build Artifact'
         run: pnpm build
+      - name: 'Unit Testing'
+        run: pnpm test
       - name: 'Publish to npm'
         run: |
           NPM_PACKAGE_NAME=$(node -p "require('./package.json').name")
