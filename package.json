@@ -1,6 +1,6 @@
 {
   "name": "shared-store-object",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Shared Store Object",
   "main": "lib/index.js",
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@moneko/common": "1.11.0",
+    "@moneko/common": "1.12.1",
     "use-sync-external-store": "1.6.0"
   },
   "devDependencies": {
